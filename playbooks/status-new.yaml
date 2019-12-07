@@ -1,0 +1,61 @@
+---
+- hosts: LB
+  become: true
+  tasks: 
+    - name: verify nginx service
+      command: service nginx status
+
+    - name: verify nginx is listening on port 80
+      wait_for: port=80 timeout=5
+
+- hosts: APP
+  become: true
+  tasks:
+    - name: verify apache2 service
+      command: service apache2 status
+
+    - name: verify apache2 is listening on port 80
+      wait_for: port=80 timeout=5
+
+- hosts: DB
+  become: true
+  tasks:
+    - name: verify mysql service
+      command: service mysql status
+
+    - name: verify nginx is listening on port 3306
+      wait_for: port=3306 timeout=5
+
+- hosts: CONTROLLER
+  tasks: 
+    - name: verify end to end connectivity
+      uri:
+        url=http://{{item}}
+        return_content=yes
+      with_items: 
+        - "{{groups.LB}}"
+      register: lb_index
+      
+    - name: fail if page doesn't contain content
+      fail:
+        msg=">>>>>>> ERROR <<<<<"
+      when: "'Hello, from sunny' not in item.content"
+      with_items: 
+       - "{{lb_index.results}}"
+      
+- hosts: LB
+  tasks: 
+    - name: verify backend response from each loadbalancer
+      uri:
+        url=http://{{item}}
+        return_content=yes
+      with_items: 
+        - "{{groups.APP}}"
+      register: app_index
+      
+    - name: fail if page doesn't contain content
+      fail:
+        msg: ">>>>>>> ERROR <<<<<"
+      when: "'Hello, from {{item.item}}' not in item.content"
+      with_items: 
+       - "{{app_index.results}}"

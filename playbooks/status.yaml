@@ -1,0 +1,61 @@
+---
+- hosts: LB
+  become: true
+  tasks: 
+    - name: verify nginx service
+      command: service nginx status
+
+    - name: verify nginx is listening on port 80
+      wait_for: port=80 timeout=5
+
+- hosts: APP
+  become: true
+  tasks:
+    - name: verify apache2 service
+      command: service apache2 status
+
+    - name: verify apache2 is listening on port 80
+      wait_for: port=80 timeout=5
+
+- hosts: DB
+  become: true
+  tasks:
+    - name: verify mysql service
+      command: service mysql status
+
+    - name: verify nginx is listening on port 3306
+      wait_for: port=3306 timeout=5
+
+- hosts: CONTROLLER
+  tasks:
+    - name: verify end-to-end index response
+      uri: url=http://{{item}} return_content=yes
+      with_items: "{{groups['LB']}}"
+      register: lb_index
+    - fail: msg="index failed to return content"
+      when: "'Hello, from sunny' not in item.content"
+      with_items: "{{lb_index.results}}"
+    - name: verify end-to-end db response
+      uri: url=http://{{item}}/db return_content=yes
+      with_items: "{{groups['LB']}}"
+      register: lb_db
+    - fail: msg="db failed to return content"
+      when: "'Database Connected from' not in item.content"
+      with_items: "{{lb_db.results}}"
+
+- hosts: LB
+  tasks:
+    - name: verify backend index response
+      uri: url=http://{{item}} return_content=yes
+      with_items: "{{groups['APP']}}"
+      register: app_index
+    - fail: msg="index failed to return content"
+      when: "'Hello, from sunny' not in item.content"
+      with_items: "{{app_index.results}}"
+    - name: verify backend db response
+      uri: url=http://{{item}}/db return_content=yes
+      with_items: "{{groups['APP']}}"
+      register: app_db
+    - fail: msg="db failed to return content"
+      when: "'Database Connected from' not in item.content"
+      with_items: "{{app_db.results}}"

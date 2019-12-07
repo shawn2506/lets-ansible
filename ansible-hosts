@@ -1,0 +1,14 @@
+[LB]
+lb
+
+[APP]
+app
+
+[DB]
+db
+
+[CONTROLLER]
+controller ansible_connection=local
+
+#[cp]
+#13.124.19.114
